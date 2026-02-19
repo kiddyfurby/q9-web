@@ -1,5 +1,5 @@
 <script lang="ts">
-		import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import GLYPH_DATA from './data/glyph.json';
 	import KEYMAP from './data/keymap.json';
 
@@ -10,13 +10,14 @@
 	let isDragging = false;
 	let dragOffsetX = 0;
 	let dragOffsetY = 0;
-	let widgetEl: HTMLDivElement;
+	let widgetEl = $state<HTMLDivElement | null>(null);
 	let hasMoved = false;
 
 	// Q9 States
 	let code = $state('');
 	let page = $state(0);
 	let enabled = $state(false);
+	let visible = $state(false);
 	let timeoutId: any;
 
 	// Dynamic Data
@@ -28,10 +29,15 @@
 	const currentKeymap = $derived(keyboardLayout === 'numpad' ? KEYMAP.numpad : KEYMAP.qwerty);
 
 	function handleKeyDown(e: KeyboardEvent) {
-		if (e.shiftKey) {
-			clearTimeout(timeoutId);
+		if (e.ctrlKey && e.shiftKey) {
+			if (timeoutId) return;
 			timeoutId = setTimeout(() => {
-				enabled = !enabled;
+				if (!visible) {
+					visible = true;
+					enabled = true;
+				} else {
+					enabled = !enabled;
+				}
 				status = enabled ? 'Enabled' : 'Disabled';
 				setTimeout(() => (status = 'Ready'), 1000);
 			}, 300);
@@ -47,13 +53,22 @@
 	}
 
 	function handleKeyUp(e: KeyboardEvent) {
-		if (e.key === 'Shift') {
+		if (e.key === 'Control' || e.key === 'Shift') {
 			clearTimeout(timeoutId);
+			timeoutId = null;
 		}
 	}
 
+	$effect(() => {
+		if (visible && widgetEl && !hasMoved) {
+			const initialX = window.innerWidth - 180;
+			const initialY = window.innerHeight - 250;
+			widgetEl.style.left = `${initialX}px`;
+			widgetEl.style.top = `${initialY}px`;
+		}
+	});
+
 	onMount(async () => {
-		// Load dynamic data
 		const data = await chrome.storage.local.get(['q9_db', 'activated', 'keyboard_layout']);
 		if (data.activated) {
 			DB = data.q9_db as Record<string, string>;
@@ -66,7 +81,6 @@
 			keyboardLayout = data.keyboard_layout as string;
 		}
 
-		// Listen for storage changes
 		const storageListener = (changes: any) => {
 			if (changes.keyboard_layout) {
 				keyboardLayout = changes.keyboard_layout.newValue as string;
@@ -79,14 +93,6 @@
 			}
 		};
 		chrome.storage.onChanged.addListener(storageListener);
-
-		// Initialize position safely
-		const initialX = window.innerWidth - 180;
-		const initialY = window.innerHeight - 250;
-		if (widgetEl) {
-			widgetEl.style.left = `${initialX}px`;
-			widgetEl.style.top = `${initialY}px`;
-		}
 
 		window.addEventListener('keydown', handleKeyDown, true);
 		window.addEventListener('keyup', handleKeyUp, true);
@@ -166,7 +172,6 @@
 			}
 		}
 
-		// validate
 		if (!isCodeMode(nextCode)) {
 			if (!(DB as Record<string, string>)[nextCode]) {
 				nextCode = nextCode.slice(0, -1);
@@ -188,22 +193,21 @@
 		isDragging = true;
 		hasMoved = false;
 
-		const rect = widgetEl.getBoundingClientRect();
-		dragOffsetX = e.clientX - rect.left;
-		dragOffsetY = e.clientY - rect.top;
-
-		try {
-			widgetEl.setPointerCapture(e.pointerId);
-		} catch (e) {}
+		if (widgetEl) {
+			const rect = widgetEl.getBoundingClientRect();
+			dragOffsetX = e.clientX - rect.left;
+			dragOffsetY = e.clientY - rect.top;
+			try {
+				widgetEl.setPointerCapture(e.pointerId);
+			} catch (e) {}
+		}
 	}
 
 	function onDrag(e: PointerEvent) {
 		if (!isDragging) return;
 		hasMoved = true;
-
 		const x = e.clientX - dragOffsetX;
 		const y = e.clientY - dragOffsetY;
-
 		if (widgetEl) {
 			widgetEl.style.left = `${x}px`;
 			widgetEl.style.top = `${y}px`;
@@ -213,13 +217,14 @@
 	function stopDrag(e: PointerEvent) {
 		if (isDragging) {
 			isDragging = false;
-			try {
-				widgetEl.releasePointerCapture(e.pointerId);
-			} catch (e) {}
+			if (widgetEl) {
+				try {
+					widgetEl.releasePointerCapture(e.pointerId);
+				} catch (e) {}
+			}
 		}
 	}
 
-	// UI Derived state
 	const displayData = $derived.by(() => {
 		let candidates = '';
 		let key0Text = '';
@@ -263,6 +268,7 @@
 
 <svelte:window onpointermove={onDrag} onpointerup={stopDrag} />
 
+{#if visible}
 <div
 	class="extension-widget"
 	class:disabled={!enabled}
@@ -293,13 +299,6 @@
         </button>
 	</div>
 
-    <style>
-        .settings-gear:hover svg {
-            color: var(--text) !important;
-            transform: rotate(30deg);
-        }
-    </style>
-
 	<div class="q9ime_container">
 		{#each keypad as cell}
 			<button type="button" onclick={() => handleKey(cell.code)}>
@@ -312,3 +311,11 @@
 		<button type="button" class="q9_bottom" onclick={() => handleKey('10')}> 取消 </button>
 	</div>
 </div>
+{/if}
+
+<style>
+    .settings-gear:hover svg {
+        color: var(--text) !important;
+        transform: rotate(30deg);
+    }
+</style>
