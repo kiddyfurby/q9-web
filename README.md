@@ -1,6 +1,7 @@
 # Q9 Extension
 
 A modern, draggable Chrome Extension that brings the **Q9 (九方)** input method to any web page. Built with **Svelte 5** and **Vite**, it features a sleek glassmorphic UI and full physical keyboard support.
+[**View Installation Guide & Download ZIP**](https://kiddyfurby.github.io/q9-web/)
 
 ## 🚀 Features
 
