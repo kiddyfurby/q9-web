@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { fly } from 'svelte/transition';
 	import GLYPH_DATA from './data/glyph.json';
 	import KEYMAP from './data/keymap.json';
 
@@ -19,6 +20,7 @@
 	let enabled = $state(false);
 	let visible = $state(false);
 	let timeoutId: any;
+	let activeKey = $state<string | null>(null);
 
 	// Dynamic Data
 	let DB = $state({} as Record<string, string>);
@@ -46,7 +48,9 @@
 		if (!enabled) return;
 
 		if (currentKeymap.hasOwnProperty(e.code)) {
-			handleKey(String((currentKeymap as any)[e.code]));
+			const k = String((currentKeymap as any)[e.code]);
+			activeKey = k;
+			handleKey(k);
 			e.preventDefault();
 			e.stopPropagation();
 		}
@@ -57,12 +61,22 @@
 			clearTimeout(timeoutId);
 			timeoutId = null;
 		}
+		if (enabled && currentKeymap.hasOwnProperty(e.code)) {
+			const k = String((currentKeymap as any)[e.code]);
+			if (activeKey === k) {
+				activeKey = null;
+			}
+		}
+	}
+
+	function handleBlur() {
+		activeKey = null;
 	}
 
 	$effect(() => {
 		if (visible && widgetEl && !hasMoved) {
-			const initialX = window.innerWidth - 180;
-			const initialY = window.innerHeight - 250;
+			const initialX = Math.round(window.innerWidth - 180);
+			const initialY = Math.round(window.innerHeight - 250);
 			widgetEl.style.left = `${initialX}px`;
 			widgetEl.style.top = `${initialY}px`;
 		}
@@ -96,11 +110,13 @@
 
 		window.addEventListener('keydown', handleKeyDown, true);
 		window.addEventListener('keyup', handleKeyUp, true);
+		window.addEventListener('blur', handleBlur, true);
 	});
 
 	onDestroy(() => {
 		window.removeEventListener('keydown', handleKeyDown, true);
 		window.removeEventListener('keyup', handleKeyUp, true);
+		window.removeEventListener('blur', handleBlur, true);
 	});
 
 	function isCodeMode(c: string) {
@@ -206,8 +222,8 @@
 	function onDrag(e: PointerEvent) {
 		if (!isDragging) return;
 		hasMoved = true;
-		const x = e.clientX - dragOffsetX;
-		const y = e.clientY - dragOffsetY;
+		const x = Math.round(e.clientX - dragOffsetX);
+		const y = Math.round(e.clientY - dragOffsetY);
 		if (widgetEl) {
 			widgetEl.style.left = `${x}px`;
 			widgetEl.style.top = `${y}px`;
@@ -277,45 +293,41 @@
 	onpointerdown={startDrag}
 	bind:this={widgetEl}
 >
-	<div class="status-bar">
-		<span class="status-btn">{enabled ? 'Q9' : 'OFF'}</span>
-		<span class="status-msg">
-            {status}
-            {#if !activated}
-                <button type="button" onclick={() => chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS' })} style="background: none; border: none; color: #818cf8; margin-left: 5px; padding: 0; font-size: inherit; cursor: pointer; pointer-events: auto; text-decoration: underline;">Activate</button>
-            {/if}
-        </span>
-        <button 
-            type="button" 
-            class="settings-gear" 
-            aria-label="Settings"
-            onclick={() => chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS' })}
-            style="margin-left: auto; background: none; border: none; padding: 4px; cursor: pointer; display: flex; align-items: center; pointer-events: auto;"
-        >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-dim); transition: color 0.2s;">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-        </button>
-	</div>
 
 	<div class="q9ime_container">
-		{#each keypad as cell}
-			<button type="button" onclick={() => handleKey(cell.code)}>
-				{displayData.candidates[cell.index] || NULL_CHAR}
+		<div class="q9_keypad_grid_wrapper">
+			{#key page}
+				<div 
+					class="q9_keypad_grid"
+					in:fly={{ y: 130, duration: 220 }}
+					out:fly={{ y: -130, duration: 220 }}
+				>
+					{#each keypad as cell}
+						<button type="button" class:active={activeKey === cell.code} onclick={() => handleKey(cell.code)}>
+							<span class="candidate-wrapper">
+								{#key code}
+									<span 
+										class="candidate-text"
+										in:fly={{ y: -12, duration: 120 }}
+										out:fly={{ y: 12, duration: 120 }}
+									>
+										{displayData.candidates[cell.index] || NULL_CHAR}
+									</span>
+								{/key}
+							</span>
+						</button>
+					{/each}
+				</div>
+			{/key}
+		</div>
+		<div class="q9_bottom_row">
+			<button type="button" class="q9_long q9_bottom" class:active={activeKey === '0'} onclick={() => handleKey('0')}>
+				{displayData.key0Text}
 			</button>
-		{/each}
-		<button type="button" class="q9_long q9_bottom" onclick={() => handleKey('0')}>
-			{displayData.key0Text}
-		</button>
-		<button type="button" class="q9_bottom" onclick={() => handleKey('10')}> 取消 </button>
+			<button type="button" class="q9_bottom" class:active={activeKey === '10'} onclick={() => handleKey('10')}> 取消 </button>
+		</div>
 	</div>
 </div>
 {/if}
 
-<style>
-    .settings-gear:hover svg {
-        color: var(--text) !important;
-        transform: rotate(30deg);
-    }
-</style>
+

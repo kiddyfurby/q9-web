@@ -47,7 +47,10 @@ styleEl.textContent =
   :host {
     display: block;
     color: white;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang TC", "PingFang HK", "Microsoft JhengHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 `;
 shadow.appendChild(styleEl);
