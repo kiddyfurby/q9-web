@@ -27,8 +27,11 @@
 	const GLYPH = GLYPH_DATA;
 	let activated = $state(false);
 	let keyboardLayout = $state('qwerty');
+	let largeFont = $state(false);
 
 	const currentKeymap = $derived(keyboardLayout === 'numpad' ? KEYMAP.numpad : KEYMAP.qwerty);
+	const gridHeight = $derived(largeFont ? 195 : 130);
+	const charFlyY = $derived(largeFont ? 18 : 12);
 
 	function handleKeyDown(e: KeyboardEvent) {
 		if (e.ctrlKey && e.shiftKey) {
@@ -83,7 +86,7 @@
 	});
 
 	onMount(async () => {
-		const data = await chrome.storage.local.get(['q9_db', 'activated', 'keyboard_layout']);
+		const data = await chrome.storage.local.get(['q9_db', 'activated', 'keyboard_layout', 'large_font']);
 		if (data.activated) {
 			DB = data.q9_db as Record<string, string>;
 			activated = true;
@@ -95,9 +98,16 @@
 			keyboardLayout = data.keyboard_layout as string;
 		}
 
+		if (data.large_font) {
+			largeFont = data.large_font as boolean;
+		}
+
 		const storageListener = (changes: any) => {
 			if (changes.keyboard_layout) {
 				keyboardLayout = changes.keyboard_layout.newValue as string;
+			}
+			if (changes.large_font) {
+				largeFont = changes.large_font.newValue as boolean;
 			}
 			if (changes.activated && changes.activated.newValue) {
 				activated = true;
@@ -288,6 +298,7 @@
 <div
 	class="extension-widget"
 	class:disabled={!enabled}
+	class:large-font={largeFont}
 	role="application"
 	style="position: absolute;"
 	onpointerdown={startDrag}
@@ -299,8 +310,8 @@
 			{#key page}
 				<div 
 					class="q9_keypad_grid"
-					in:fly={{ y: 130, duration: 220 }}
-					out:fly={{ y: -130, duration: 220 }}
+					in:fly={{ y: gridHeight, duration: 220 }}
+					out:fly={{ y: -gridHeight, duration: 220 }}
 				>
 					{#each keypad as cell}
 						<button type="button" class:active={activeKey === cell.code} onclick={() => handleKey(cell.code)}>
@@ -308,8 +319,8 @@
 								{#key code}
 									<span 
 										class="candidate-text"
-										in:fly={{ y: -12, duration: 120 }}
-										out:fly={{ y: 12, duration: 120 }}
+									in:fly={{ y: -charFlyY, duration: 120 }}
+										out:fly={{ y: charFlyY, duration: 120 }}
 									>
 										{displayData.candidates[cell.index] || NULL_CHAR}
 									</span>

@@ -9,20 +9,29 @@
 	}
 
 	let keyboardLayout = $state('qwerty');
+	let largeFont = $state(false);
 	let status = $state('');
 	let statusType = $state(''); // 'success' | 'error' | ''
 	let fileInput: HTMLInputElement;
 
 	onMount(async () => {
-		const data = await chrome.storage.local.get(['keyboard_layout']);
+		const data = await chrome.storage.local.get(['keyboard_layout', 'large_font']);
 		if (data.keyboard_layout) {
 			keyboardLayout = data.keyboard_layout as string;
+		}
+		if (data.large_font) {
+			largeFont = data.large_font as boolean;
 		}
 	});
 
 	async function saveLayout(layout: string) {
 		keyboardLayout = layout;
 		await chrome.storage.local.set({ keyboard_layout: layout });
+	}
+
+	async function saveLargeFont(enabled: boolean) {
+		largeFont = enabled;
+		await chrome.storage.local.set({ large_font: enabled });
 	}
 
 	let dragging = $state(false);
@@ -75,13 +84,32 @@
 			status = `Calibrated. Extracting ${recipes.db.length} entries...`;
 
 			const db: Record<string, string> = {};
+			const pua: Record<string, string> = (recipes as any).pua || {};
 			for (const r of recipes.db) {
 				const start = r.o + delta;
 				const bytes = r.l * 2;
 				if (start >= 0 && start + bytes <= uint8.length) {
 					try {
-						const slice = uint8.slice(start, start + bytes);
-						db[r.k] = decoder.decode(slice);
+						if ((recipes as any).puamode) {
+							// Pair-by-pair WHATWG Big5 decode with IME overrides.
+							// a140 (U+3000) pairs are kept as spacers for position
+							// alignment — ContentApp.svelte prevents selecting them.
+							let s = '';
+							for (let t = start; t < start + bytes; t += 2) {
+								const hi = uint8[t], lo = uint8[t + 1];
+								if (hi === 0x7c && lo === 0x7c) break; // pipe terminator
+								const key = hi.toString(16).padStart(2, '0') + lo.toString(16).padStart(2, '0');
+								let ch = pua[key];
+								if (ch === undefined) {
+									ch = decoder.decode(new Uint8Array([hi, lo]));
+								}
+								s += ch;
+							}
+							db[r.k] = s;
+						} else {
+							const slice = uint8.slice(start, start + bytes);
+							db[r.k] = decoder.decode(slice);
+						}
 					} catch (err) {
 						console.error(`Failed to decode key ${r.k}`);
 					}
@@ -136,6 +164,20 @@
             <label style="cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                 <input type="radio" name="layout" value="numpad" checked={keyboardLayout === 'numpad'} onchange={() => saveLayout('numpad')} />
                 Numpad
+            </label>
+        </div>
+    </div>
+
+    <div class="settings-section" style="margin-bottom: 2rem;">
+        <h3 style="font-size: 1rem; margin-bottom: 1rem;">Font Size</h3>
+        <div style="display: flex; gap: 1rem;">
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                <input type="radio" name="fontsize" value="normal" checked={!largeFont} onchange={() => saveLargeFont(false)} />
+                Normal
+            </label>
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                <input type="radio" name="fontsize" value="large" checked={largeFont} onchange={() => saveLargeFont(true)} />
+                Large (HiDPI)
             </label>
         </div>
     </div>

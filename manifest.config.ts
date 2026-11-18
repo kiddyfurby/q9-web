@@ -1,6 +1,6 @@
 export default {
 	name: 'Q9 Extension',
-	version: '1.0.0',
+	version: '1.1.2',
 	manifest_version: 3,
 	icons: {
 		'72': 'src/assets/icon_72.png',

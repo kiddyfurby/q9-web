@@ -25,6 +25,44 @@
 	text-rendering: optimizeLegibility;
 }
 
+/* Large font mode (for HiDPI displays) */
+.extension-widget.large-font {
+	width: 210px;
+	padding: 12px;
+}
+
+.extension-widget.large-font .status-bar {
+	font-size: 0.975rem;
+	margin-bottom: 9px;
+}
+
+.extension-widget.large-font .status-msg {
+	font-size: 0.9rem;
+}
+
+.extension-widget.large-font .q9ime_container button {
+	font-size: 2.1rem;
+	height: 60px;
+	border-radius: 6px;
+}
+
+.extension-widget.large-font .q9ime_container button.q9_bottom {
+	font-size: 1.2rem;
+}
+
+.extension-widget.large-font .q9_keypad_grid_wrapper {
+	height: 195px;
+}
+
+.extension-widget.large-font .q9_keypad_grid {
+	grid-gap: 8px;
+}
+
+.extension-widget.large-font .q9_bottom_row {
+	grid-gap: 8px;
+	margin-top: 8px;
+}
+
 .extension-widget:active {
 	cursor: grabbing;
 }
